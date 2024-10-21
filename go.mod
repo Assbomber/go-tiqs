@@ -1,4 +1,4 @@
-module github.com/Assbomber/go-tiqs
+module github.com/Assbomber/tiqs-go
 
 go 1.22.0
 
