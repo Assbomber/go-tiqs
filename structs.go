@@ -496,7 +496,7 @@ type TiqsWSClient struct {
 	wsURL               string
 	enableLog           bool
 	stopReadMessagesSig chan bool
-	pingChecker         *time.Ticker
+	stopPingListenerSig chan bool
 	subscriptions       map[int]struct{} // All active subscriptions
 	tickChannel         chan Tick        // data channel where data will come
 	orderChannel        chan OrderUpdate // data channel where order update will come
