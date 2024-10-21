@@ -491,13 +491,12 @@ type TiqsWSClient struct {
 	appID               string
 	accessToken         string
 	socket              *websocket.Conn
-	pingCheckerTimer    *time.Timer
 	lastPingTS          time.Time
 	pendingQueue        []interface{}
 	wsURL               string
 	enableLog           bool
 	stopReadMessagesSig chan bool
-	stopPingListenerSig chan bool
+	pingChecker         *time.Ticker
 	subscriptions       map[int]struct{} // All active subscriptions
 	tickChannel         chan Tick        // data channel where data will come
 	orderChannel        chan OrderUpdate // data channel where order update will come

@@ -58,7 +58,6 @@ func (c *Client) NewSocket(enableLog bool) (*TiqsWSClient, error) {
 		orderChannel:        make(chan OrderUpdate, BUFFER_SIZE),
 		enableLog:           enableLog,
 		stopReadMessagesSig: make(chan bool),
-		stopPingListenerSig: make(chan bool),
 		wsURL:               fmt.Sprintf("%s?appId=%s&token=%s", SOCKET_URL, c.appID, c.accessToken),
 	}
 	tiqsWSClient.connectSocket()
@@ -158,7 +157,7 @@ func (t *TiqsWSClient) closeAndReconnect() {
 	go func() {
 		// first stop reading messages
 		t.stopReadMessagesSig <- true
-		t.stopPingListenerSig <- true
+		t.pingChecker.Stop()
 		t.CloseConnection()
 		t.connectSocket()
 	}()
@@ -211,18 +210,13 @@ func (t *TiqsWSClient) startPingChecker() {
 
 	t.lastPingTS = time.Now()
 	window := 35 * time.Second
-	ticker := time.NewTicker(window)
-	for range ticker.C {
-		select {
-		case <-t.stopPingListenerSig:
-			return
-		default:
-			diff := time.Since(t.lastPingTS)
-			if diff > window {
-				t.logger(INFO_SOCKET_PING_DIFFERENCE)
-				// close and reconnect connection
-				t.closeAndReconnect()
-			}
+	t.pingChecker= time.NewTicker(window)
+	for range t.pingChecker.C {
+		diff := time.Since(t.lastPingTS)
+		if diff > window {
+			t.logger(INFO_SOCKET_PING_DIFFERENCE)
+			// close and reconnect connection
+			t.closeAndReconnect()
 		}
 
 	}
