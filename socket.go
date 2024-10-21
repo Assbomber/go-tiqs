@@ -32,7 +32,7 @@ const (
 	InfoSocketConnecting                   = "⏳ Connecting to socket..."
 	INFO_SOCKET_PING_DIFFERENCE            = "🆚 Socket ping difference exceeded: Reconnecting..."
 	INFO_PROCCESSING_PENDING_REQUESTS      = "⏳ Processing pending requests..."
-	INFO_PROCCESSING_PREVIOUS_SUBSCRIPTION = "⏳ Processing previous subscriptions if any..."
+	INFO_PROCCESSING_PREVIOUS_SUBSCRIPTION = "⏳ Processing previous subscriptions..."
 	INFO_CLOSED_WEBSOCKET                  = "🔴 WebSocket connection closed"
 	INFO_INVALID_TICK_DATA                 = "Invalid tick data length "
 )
@@ -94,11 +94,11 @@ func (t *TiqsWSClient) connectSocket() {
 	}
 
 	t.logger(InfoSocketConnected)
-	// ping checker
-	t.startPingChecker()
 	// process previous connections
 	t.subscribePreviousSubscriptions()
 	t.processPendingRequests()
+	// ping checker
+	go t.startPingChecker()
 
 	t.socket.SetReadLimit(1024 * 1024) // Set max message size to 1MB (adjust as needed)
 	go t.readMessages()
@@ -200,15 +200,19 @@ func (t *TiqsWSClient) emit(message interface{}, volatile bool) {
 // startPingChecker initiates a periodic check to ensure the connection is alive
 // If no PING is received within 35 seconds, it triggers a reconnection
 func (t *TiqsWSClient) startPingChecker() {
+	t.logger("Starting ping checker")
+	defer t.logger("Stopped ping checker")
+
 	if t.pingCheckerTimer != nil {
 		t.pingCheckerTimer.Stop()
 	}
 
 	t.lastPingTS = time.Now()
-
-	t.pingCheckerTimer = time.AfterFunc(35*time.Second, func() {
+	window := 35 * time.Second
+	ticker := time.NewTicker(window)
+	for range ticker.C {
 		diff := time.Since(t.lastPingTS)
-		if diff > 35*time.Second {
+		if diff > window {
 			t.logger(INFO_SOCKET_PING_DIFFERENCE)
 			// first stop reading messages
 			t.stopReadMessagesSig <- true
@@ -216,8 +220,7 @@ func (t *TiqsWSClient) startPingChecker() {
 			t.closeAndReconnect()
 			return
 		}
-		t.startPingChecker()
-	})
+	}
 }
 
 // processPendingRequests sends any queued messages that couldn't be sent earlier
@@ -236,13 +239,15 @@ func (t *TiqsWSClient) processPendingRequests() {
 // subscribePreviousSubscriptions resubscribes to all previously subscribed topics
 // This is useful when reconnecting to ensure all subscriptions are maintained
 func (t *TiqsWSClient) subscribePreviousSubscriptions() {
-	t.logger(INFO_PROCCESSING_PREVIOUS_SUBSCRIPTION)
-	for token := range t.subscriptions {
-		t.emit(SocketMessage{
-			Code: CODE_SUB,
-			Mode: MODE_FULL,
-			Full: []int{token},
-		}, false)
+	if len(t.subscriptions) != 0 {
+		t.logger(INFO_PROCCESSING_PREVIOUS_SUBSCRIPTION)
+		for token := range t.subscriptions {
+			t.emit(SocketMessage{
+				Code: CODE_SUB,
+				Mode: MODE_FULL,
+				Full: []int{token},
+			}, false)
+		}
 	}
 }
 
