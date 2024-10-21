@@ -116,7 +116,7 @@ func (t *TiqsWSClient) readMessages() {
 				t.logger(ErrReadingSocketMessage, ". reason:", err)
 			}
 			// reconnect
-			t.closeAndReconnect()
+			go t.closeAndReconnect()
 			return
 		}
 
