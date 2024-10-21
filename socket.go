@@ -58,6 +58,7 @@ func (c *Client) NewSocket(enableLog bool) (*TiqsWSClient, error) {
 		orderChannel:        make(chan OrderUpdate, BUFFER_SIZE),
 		enableLog:           enableLog,
 		stopReadMessagesSig: make(chan bool),
+		stopPingListenerSig: make(chan bool),
 		wsURL:               fmt.Sprintf("%s?appId=%s&token=%s", SOCKET_URL, c.appID, c.accessToken),
 	}
 	tiqsWSClient.connectSocket()
@@ -107,10 +108,11 @@ func (t *TiqsWSClient) connectSocket() {
 // readMessages continuously reads messages from the WebSocket
 // It handles different types of messages, including PING messages
 func (t *TiqsWSClient) readMessages() {
+	t.logger("Starting read messages")
+	defer t.logger("Stopped read messages")
 	for {
 		select {
 		case <-t.stopReadMessagesSig:
-			t.logger("Stopping read messages")
 			return
 		default:
 			// read message ---------------------------------------------------------
@@ -122,8 +124,8 @@ func (t *TiqsWSClient) readMessages() {
 					t.logger(ErrReadingSocketMessage, ". reason:", err)
 				}
 				// reconnect
-				go t.closeAndReconnect()
-				return
+				t.closeAndReconnect()
+				continue
 			}
 
 			// decode messages ------------------------------------------------------
@@ -145,7 +147,6 @@ func (t *TiqsWSClient) readMessages() {
 
 			} else { // unknown message
 				t.logger(fmt.Sprintf("Received message with unexpected length: %d, message: %s", len(message), string(message[:min(50, len(message))])))
-
 			}
 
 		}
@@ -154,8 +155,13 @@ func (t *TiqsWSClient) readMessages() {
 }
 
 func (t *TiqsWSClient) closeAndReconnect() {
-	t.CloseConnection()
-	t.connectSocket()
+	go func() {
+		// first stop reading messages
+		t.stopReadMessagesSig <- true
+		t.stopPingListenerSig <- true
+		t.CloseConnection()
+		t.connectSocket()
+	}()
 }
 
 // emit sends a message through the WebSocket
@@ -203,23 +209,22 @@ func (t *TiqsWSClient) startPingChecker() {
 	t.logger("Starting ping checker")
 	defer t.logger("Stopped ping checker")
 
-	if t.pingCheckerTimer != nil {
-		t.pingCheckerTimer.Stop()
-	}
-
 	t.lastPingTS = time.Now()
 	window := 35 * time.Second
 	ticker := time.NewTicker(window)
 	for range ticker.C {
-		diff := time.Since(t.lastPingTS)
-		if diff > window {
-			t.logger(INFO_SOCKET_PING_DIFFERENCE)
-			// first stop reading messages
-			t.stopReadMessagesSig <- true
-			// close and reconnect connection
-			t.closeAndReconnect()
+		select {
+		case <-t.stopPingListenerSig:
 			return
+		default:
+			diff := time.Since(t.lastPingTS)
+			if diff > window {
+				t.logger(INFO_SOCKET_PING_DIFFERENCE)
+				// close and reconnect connection
+				t.closeAndReconnect()
+			}
 		}
+
 	}
 }
 
@@ -289,19 +294,13 @@ func (t *TiqsWSClient) GetOrderChannel() <-chan OrderUpdate {
 
 // CloseConnection closes the WebSocket connection
 func (t *TiqsWSClient) CloseConnection() {
+	t.logger(INFO_CLOSED_WEBSOCKET)
 	if t.socket == nil {
 		return
 	}
 
 	t.socket.Close()
 	t.socket = nil
-	t.logger(INFO_CLOSED_WEBSOCKET)
-
-	// Stop timers
-	if t.pingCheckerTimer != nil {
-		t.pingCheckerTimer.Stop()
-		t.pingCheckerTimer = nil
-	}
 
 	// Clear pending queue
 	t.pendingQueue = nil
