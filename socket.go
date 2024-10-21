@@ -214,6 +214,7 @@ func (t *TiqsWSClient) startPingChecker() {
 			t.stopReadMessagesSig <- true
 			// close and reconnect connection
 			t.closeAndReconnect()
+			return
 		}
 		t.startPingChecker()
 	})
