@@ -158,6 +158,7 @@ func (t *TiqsWSClient) closeAndReconnect() {
 	go func() {
 		// first stop reading messages
 		t.stopReadMessagesSig <- true
+		t.stopPingListenerSig <- true
 		t.CloseConnection()
 		t.connectSocket()
 	}()
@@ -214,6 +215,7 @@ func (t *TiqsWSClient) startPingChecker() {
 	for {
 		select {
 		case <-t.stopPingListenerSig:
+			ticker.Stop()
 			return
 		case <-ticker.C:
 			diff := time.Since(t.lastPingTS)
