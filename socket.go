@@ -57,7 +57,7 @@ func (c *Client) NewSocket(enableLog bool) (*TiqsWSClient, error) {
 		tickChannel:         make(chan Tick, BUFFER_SIZE),
 		orderChannel:        make(chan OrderUpdate, BUFFER_SIZE),
 		enableLog:           enableLog,
-		stopReadMessagesSig: make(chan bool, 1),
+		stopReadMessagesSig: make(chan bool),
 		wsURL:               fmt.Sprintf("%s?appId=%s&token=%s", SOCKET_URL, c.appID, c.accessToken),
 	}
 	tiqsWSClient.connectSocket()
@@ -144,7 +144,7 @@ func (t *TiqsWSClient) readMessages() {
 				t.tickChannel <- tick
 
 			} else { // unknown message
-				t.logger(fmt.Sprintf("Received message with unexpected length: %d, message: %s", len(message), string(message[:min(50,len(message))])))
+				t.logger(fmt.Sprintf("Received message with unexpected length: %d, message: %s", len(message), string(message[:min(50, len(message))])))
 
 			}
 
