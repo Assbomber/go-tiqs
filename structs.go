@@ -488,14 +488,15 @@ type OptionSymbol struct {
 // TiqsWSClient represents the tiqs Websocket client
 type TiqsWSClient struct {
 	*Client
-	appID            string
-	accessToken      string
-	socket           *websocket.Conn
-	pingCheckerTimer *time.Timer
-	lastPingTS       time.Time
-	pendingQueue     []interface{}
-	wsURL            string
-	enableLog        bool
+	appID               string
+	accessToken         string
+	socket              *websocket.Conn
+	pingCheckerTimer    *time.Timer
+	lastPingTS          time.Time
+	pendingQueue        []interface{}
+	wsURL               string
+	enableLog           bool
+	stopReadMessagesSig chan bool
 
 	subscriptions map[int]struct{} // All active subscriptions
 	tickChannel   chan Tick        // data channel where data will come
