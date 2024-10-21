@@ -1,5 +1,6 @@
 # go-tiqs
 
-package to connect to tiqs Apis.
+Library for interacting with Tiqs APIs
 
-Important: Currently under development.
+⚠️ Under Development
+
