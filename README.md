@@ -2,4 +2,4 @@
 
 package to connect to tiqs Apis.
 
-Important: Currently under development
+Important: Currently under development.
