@@ -58,6 +58,7 @@ func (c *Client) NewSocket(enableLog bool) (*TiqsWSClient, error) {
 		orderChannel:        make(chan OrderUpdate, BUFFER_SIZE),
 		enableLog:           enableLog,
 		stopReadMessagesSig: make(chan bool),
+		stopPingListenerSig: make(chan bool),
 		wsURL:               fmt.Sprintf("%s?appId=%s&token=%s", SOCKET_URL, c.appID, c.accessToken),
 	}
 	tiqsWSClient.connectSocket()
@@ -97,10 +98,10 @@ func (t *TiqsWSClient) connectSocket() {
 	// process previous connections
 	t.subscribePreviousSubscriptions()
 	t.processPendingRequests()
+	t.socket.SetReadLimit(1024 * 1024) // Set max message size to 1MB (adjust as needed)
 	// ping checker
 	go t.startPingChecker()
-
-	t.socket.SetReadLimit(1024 * 1024) // Set max message size to 1MB (adjust as needed)
+	// read messages
 	go t.readMessages()
 }
 
